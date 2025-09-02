@@ -49,31 +49,43 @@ def wicc(ctx, device, ip, mib_path, mib_name, verbose):
 def cli_channel(obj, channel : int):
     obj.channel = channel
 
-@wicc.command("voltage")
+@wicc.command("set", help = ("Set VOLTAGE (V) and CURRENT (I) for channel"))
+@click.argument("current", metavar="[CURRENT]", required=False, default=None)
 @click.argument("voltage", metavar="[VOLTAGE]", type=click.FLOAT, required=False, default=None)
 @click.pass_obj
-def cli_voltage(obj, voltage : float | int):
+def cli_set(obj, voltage : float | int , current : float | int):
     """
-    Set VOLTAGE (V) for channel output, or query voltage setpoint if VOLTAGE not specified. 
+    Set VOLTAGE (V) and CURRENT (A) for channel output. "
     """
-    if voltage is None:
-        volt = obj.get_voltage(obj.channel)
-        click.echo(f"{volt:.3f} V")
-        return volt
-    return obj.set_voltage(obj.channel, float(voltage))
+    v_set, i_set = obj.set_output(obj.channel, voltage, current)
+    return f"CH{obj.channel}: {i_set} A, {v_set} V"
 
-@wicc.command("current")
-@click.argument("current", metavar="[CURRENT]", required=False, default=None)
+@wicc.command("enable")
+@click.argument("state", required = True, default = 0)
 @click.pass_obj
-def cli_current(obj, current : float | int):
-    """
-    "Set CURRENT (A) for channel output, or query current setpoint if CURRENT not specified. "
-    """
-    if current is None:
-        curr = obj.get_current(obj.channel)
-        click.echo(f"{curr:.2f} A")
-        return curr
-    return obj.set_current(obj.channel, float(current))
+def cli_enable(obj, state : int | bool | str):
+    state = 1 if state in ['on', 'ON', True, 1] else 0
+    return obj.enable_output(obj.channel, state)
+
+@wicc.command("get-current")
+@click.pass_obj
+def cli_get_current(obj):
+    return obj.get_current(obj.channel)
+
+@wicc.command("get-voltage")
+@click.pass_obj
+def cli_get_current(obj):
+    return obj.get_voltage(obj.channel)
+
+@wicc.command("meas-current")
+@click.pass_obj
+def cli_meas_current(obj):
+    return obj.meas_voltage(obj.channel)
+
+@wicc.command("meas-voltage")
+@click.pass_obj
+def cli_meas_voltage(obj):
+    return obj.meas_term_voltage(obj.channel)
 
 if __name__=='__main__':
     wicc()

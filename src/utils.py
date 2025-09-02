@@ -119,3 +119,6 @@ class LoggingFormat(logging.Formatter):
         log_fmt = self.formats.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
+    
+# def decode_output_status(bits : str):
+    
