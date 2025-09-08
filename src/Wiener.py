@@ -6,6 +6,7 @@ from functools import wraps
 import time
 import logging
 logger = logging.getLogger("WienerClass")
+logger.setLevel(logging.DEBUG)
 
 
 '''
@@ -207,19 +208,21 @@ class Wiener:
     
     def get_current(self, channel: int) -> float:
         """
-        Reads the current setpoint
+        Reads the current setpoint in A if LV and uA if HV
         """
         logger.debug(f"Reading nominal output current of CH{channel}")
         raw = asyncio.run(self.read("outputCurrent", channel))
-        return opaque_to_float(raw)
+        mult = 1e6 if self.device == 'HV' else 1
+        return opaque_to_float(raw) * mult
 
     def meas_current(self, channel: int):
         """
-        Returns the current measured at the terminal
+        Returns the current measured at the terminal in uA if HV and A if LV
         """
         logger.debug(f"Reading measured output current of CH{channel}")
         raw = asyncio.run(self.read("outputMeasurementCurrent", channel))
-        return opaque_to_float(raw)
+        mult = 1e6 if self.device == 'HV' else 1
+        return opaque_to_float(raw) * mult
 
     def set_output(self, channel : int, voltage : float, current :float):
         logger.debug(f"Setting CH{channel} to {voltage} V and {current} A")
@@ -329,13 +332,13 @@ def main():
     
     # print(wiener.get_output_status(channel = 1))
     # print(wiener.clear_events(2))
-    
+    print(f"{wiener.meas_current(1):.2f} uA")
     # print(wiener.get_output_status(channel = 1))
     # print(wiener.get_output_status(channel = 3))
     # print(wiener.set_voltage(channel=1, voltage=30.0))
     # time.sleep(1)
     # print(wiener.get_voltage(2))
-    print(wiener.enable_output(2, 'on'))
+    # print(wiener.enable_output(2, 'on'))
     # print(wiener.get_voltage(channel=2))
     # print(wiener.identify)
     # time.sleep(2)
