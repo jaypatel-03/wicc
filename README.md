@@ -1,6 +1,26 @@
 # WIener Crate Control (WICC)
 
-Simple command line interface for communicating with the W-Ie-Ne-R crate as a LV and HV power supply. 
+Simple command line interface for communicating with the W-Ie-Ne-R crate as a LV and HV power supply. The CLI commands can be (in principle) substituted in to the config files. 
+
+Prerequisities:
+- Python 3.7+
+- *nix OS
+- SNMP (see SNMP/Installation section below)
+
+Commands:
+
+All commands have the following syntax \
+```python wicc_cli.py -d [HV|LV] channel [CHANNEL 1-8] [COMMAND]```
+
+with the following commands available:\
+-```enable [0|1]```: disables/enables the output of the selected channel
+- ```get-current```: prints and returns the current setpoint in mA   
+- ```get-voltage```: prints and returns the voltage setpoint in V
+- ```meas-current```: prints and returns the current measured at the terminal in mA.
+- ```meas-voltage```: prints and returns the voltage measured across the terminal in V
+- ```set [VOLTAGE] [CURRENT]``` sets the voltage and current in V and A
+
+```wicc_cli.py --help```, as usual, will display help for the flags and commands. You can specify the IP of the crate with the ```-i``` flag, as well as turn on logging with the verbosity flag ```-v``` or ```-vv``` and specify paths to the MIB file with ```-M``` for the directory and ```-m``` for the name. 
 
 ## Hardware
 
@@ -8,12 +28,8 @@ CC24: Controller for the other modules installed in the crate. CAN1 and CAN2 are
 
 Wiener Mpod: LV supply. 2x 37-pin D-sub connectors. Bottom 5 pins are reserved for interlock functionality.  
 
-EHS 84 10n (SN: ): HV supply. EHS =, 
+EHS 84 10n (SN: ): HV supply. 
 
-Prerequisities:
-- Python 3.7+
-- *nix OS
-- SNMP (see SNMP/Installation section below)
 
 ## Communication
 

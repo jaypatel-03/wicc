@@ -6,7 +6,7 @@ from functools import wraps
 import time
 import logging
 logger = logging.getLogger("WienerClass")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 '''
@@ -60,7 +60,7 @@ class Wiener:
     
     def cli_store_channel(self, channel : int):
         if 1 <= channel <= 8: 
-            self.channel = channel
+            self.channel = self.get_channel(channel)
         else:
             raise ValueError("Channels range from 1 to 8")
         
@@ -91,7 +91,7 @@ class Wiener:
                 channel = self.get_channel(channel) if isinstance(channel, int) else channel
                 
                 
-                logger.debug(f"Sending {command}.{channel} to {self.device} Wiener module")
+                logger.warning(f"Sending {command}.{channel} to {self.device} Wiener module")
                 target = await UdpTransportTarget.create((self.host, 161))
                 oid = ObjectIdentity(self._mib_name, command, channel) \
                     .add_mib_source(self._mib_dir) \
@@ -134,7 +134,7 @@ class Wiener:
         return [ObjectType(oid, val)]
         
 
-    def set_voltage(self, channel: int, voltage: float, tries : int = 3):
+    def set_voltage(self, channel: int, voltage: float):
         """
         Set the voltage on the device.
         """
@@ -145,27 +145,9 @@ class Wiener:
                 voltage=float(voltage)
             except:
                 raise TypeError("Voltage setpoint cannot be cast to float")
-        for i in range(tries):
-            print(f"Try {i + 1}")
-            logger.debug(f"Setting output voltage of CH{channel} to {voltage} V ")
-            rval = asyncio.run(self.write('outputVoltage', channel, voltage))
-            time.sleep(5)
-            status = self.get_output_status(channel)
-            print(status)
-            if "outputLowCurrentRange" in status:
-                print("Retry after first delay")
-                self.clear_events(channel)
-                continue
-            
-            delay = voltage/5 - 5 if voltage/5 > 5 else 1
-            volt_meas = self.get_voltage(channel)
-            status = self.get_output_status(channel)
-            time.sleep(delay)
-            if (voltage - 1 <= volt_meas <= voltage + 1) and ("outputConstantVoltage" in status): 
-                return opaque_to_float(rval)
-            print("Retry after second delay")
-            self.clear_events(channel)
-        return "Failed"
+        logger.debug(f"Setting output voltage of CH{channel} to {voltage} V ")
+        rval = asyncio.run(self.write('outputVoltage', channel, voltage))
+        return opaque_to_float(rval)
     
     def get_voltage(self, channel: int) -> float:
         """
@@ -179,7 +161,6 @@ class Wiener:
         return opaque_to_float(raw)
   
     def meas_term_voltage(self, channel: int):
-        """"""
         logger.debug(f"Reading measured terminal voltage of CH{channel}")
         raw = asyncio.run(self.read("outputMeasurementTerminalVoltage", channel))
         return opaque_to_float(raw)
@@ -189,39 +170,42 @@ class Wiener:
         raw = asyncio.run(self.read("outputMeasurementSenseVoltage", channel))
         return opaque_to_float(raw)
     
-    def set_current(self, current: float, channel: int = None):
+    def set_current(self, channel: int, current: float):
         """
-        Set the current on the device.
-        
-        Args:
-            current (float): The current to set.
+        Set the current on the device. Returns setpoint in mA.
         """
-        logger.debug(f"Setting output current of CH{channel} to {current} V ")
-        if isinstance(current, int):
+        logger.debug(f"Setting output current of CH{channel} to {current} A ")
+        if not isinstance(current, float):
             try:
                 current = float(current)
             except:
                 raise TypeError("Current could not be cast to float.")
         rval = asyncio.run(self.write('outputCurrent', channel, current))
-        return opaque_to_float(rval)
+        mult = 1e3
+        # mult = 1e6 if self.device == 'HV' else 1
+        return opaque_to_float(rval) * mult
     
     
     def get_current(self, channel: int) -> float:
         """
-        Reads the current setpoint in A if LV and uA if HV
+        Reads the current setpoint in mA. 
+        Uncomment line to change to uA for HV and A for LV
         """
         logger.debug(f"Reading nominal output current of CH{channel}")
         raw = asyncio.run(self.read("outputCurrent", channel))
-        mult = 1e6 if self.device == 'HV' else 1
+        mult = 1e3
+        # mult = 1e6 if self.device == 'HV' else 1
         return opaque_to_float(raw) * mult
 
     def meas_current(self, channel: int):
         """
-        Returns the current measured at the terminal in uA if HV and A if LV
+        Returns the current measured at the terminal in mA 
+        Uncomment line to change to uA for HV and A for LV
         """
         logger.debug(f"Reading measured output current of CH{channel}")
         raw = asyncio.run(self.read("outputMeasurementCurrent", channel))
-        mult = 1e6 if self.device == 'HV' else 1
+        mult = 1e3
+        # mult = 1e6 if self.device == 'HV' else 1
         return opaque_to_float(raw) * mult
 
     def set_output(self, channel : int, voltage : float, current :float):
@@ -239,7 +223,9 @@ class Wiener:
 
     def enable_output(self, channel : int, state : int | str | bool, tries : int = 3):
         """Accepts states 0 (off), 1 (on).  
-        
+        Multiple retries in case voltage switching causes current spike.
+        Checks by waiting for the voltage to theoretically ramp up
+        and then checking error status and measured voltage.
         """
         if state in ['off', 0, False, 'OFF']:
             logger.debug(f"Turning CH{channel} OFF")
@@ -332,19 +318,16 @@ def main():
     
     # print(wiener.get_output_status(channel = 1))
     # print(wiener.clear_events(2))
-    print(f"{wiener.meas_current(1):.2f} uA")
+    # print(f"{wiener.meas_current(1):.2f} uA")
     # print(wiener.get_output_status(channel = 1))
     # print(wiener.get_output_status(channel = 3))
     # print(wiener.set_voltage(channel=1, voltage=30.0))
-    # time.sleep(1)
+    # wiener.set_voltage(50.0', channel='u101')
     # print(wiener.get_voltage(2))
     # print(wiener.enable_output(2, 'on'))
     # print(wiener.get_voltage(channel=2))
     # print(wiener.identify)
-    # time.sleep(2)
-    # wiener.set_voltage(50.0', channel='u101')
     # print(wiener.all_off())
-    # time.sleep(2)
     # print(wiener.get_voltage(channel='u101'))
     
 if __name__ == '__main__':
